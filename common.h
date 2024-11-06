@@ -118,3 +118,97 @@ float testPerformance(
 }
 
 // -----------------------------------
+// cublas测试套件
+
+float testCublasMaxError(const int M, const int N, const int K) {
+
+    size_t size_a = M * K * sizeof(float);
+    size_t size_b = K * N * sizeof(float);
+    size_t size_c = M * N * sizeof(float);
+
+    float *h_a, *h_b, *h_c, *d_a, *d_b, *d_c, *h_d_c;
+    h_a = (float *)malloc(size_a);
+    h_b = (float *)malloc(size_b);
+    h_c = (float *)malloc(size_c);
+    cudaMalloc(&d_a, size_a);
+    cudaMalloc(&d_b, size_b);
+    cudaMalloc(&d_c, size_c);
+    h_d_c = (float *)malloc(size_c);
+
+    srand(time(0));
+    for (int i = 0; i < M * K; i++)
+        h_a[i] = rand() / float(RAND_MAX);
+    for (int i = 0; i < K * N; i++)
+        h_b[i] = rand() / float(RAND_MAX);
+
+    cpuGemm(h_a, h_b, h_c, M, N, K);
+
+    cudaMemcpy(d_a, h_a, size_a, cudaMemcpyHostToDevice);
+    cudaMemcpy(d_b, h_b, size_b, cudaMemcpyHostToDevice);
+
+    cublasHandle_t cublas_handle;
+    cublasCreate(&cublas_handle);
+    float cublas_alpha = 1.0;
+    float cublas_beta = 0;
+    // cublasSgemm(cublas_handle, CUBLAS_OP_T, CUBLAS_OP_T, M, N, K, &cublas_alpha, d_a, K, d_b, N, &cublas_beta, d_c, M);
+    cublasSgemm(cublas_handle, CUBLAS_OP_N, CUBLAS_OP_N, N, M, K, &cublas_alpha, d_b, N, d_a, K, &cublas_beta, d_c, N);
+
+    cudaMemcpy(h_d_c, d_c, size_c, cudaMemcpyDeviceToHost);
+
+    float max_error = 0.0;
+    for (int i = 0; i < M * N; i++) {
+        float this_error = abs(h_d_c[i] - h_c[i]);
+        if (max_error != max_error || this_error != this_error) // nan
+            max_error = -NAN;
+        else
+            max_error = max(max_error, this_error);
+    }
+
+    free(h_a);
+    free(h_b);
+    free(h_c);
+    cudaFree(d_a);
+    cudaFree(d_b);
+    cudaFree(d_c);
+    free(h_d_c);
+
+    return max_error;
+}
+
+float testCublasPerformance(const int M, const int N, const int K, const int repeat) {
+
+    size_t size_a = M * K * sizeof(float);
+    size_t size_b = K * N * sizeof(float);
+    size_t size_c = M * N * sizeof(float);
+
+    float *d_a, *d_b, *d_c;
+    cudaMalloc(&d_a, size_a);
+    cudaMalloc(&d_b, size_b);
+    cudaMalloc(&d_c, size_c);
+
+    cublasHandle_t cublas_handle;
+    cublasCreate(&cublas_handle);
+    float cublas_alpha = 1.0;
+    float cublas_beta = 0;
+
+    cudaEvent_t start, end;
+    cudaEventCreate(&start);
+    cudaEventCreate(&end);
+    cudaEventRecord(start);
+    for (int i = 0; i < repeat; i++) {
+        //cublasSgemm(cublas_handle, CUBLAS_OP_T, CUBLAS_OP_T, M, N, K, &cublas_alpha, d_a, K, d_b, N, &cublas_beta, d_c, M);
+        cublasSgemm(cublas_handle, CUBLAS_OP_N, CUBLAS_OP_N, N, M, K, &cublas_alpha, d_b, N, d_a, K, &cublas_beta, d_c, N);
+    }
+    cudaEventRecord(end);
+    cudaEventSynchronize(end);
+
+    float msec, sec;
+    cudaEventElapsedTime(&msec, start, end);
+    sec = msec / 1000.0 / repeat;
+
+    cudaFree(d_a);
+    cudaFree(d_b);
+    cudaFree(d_c);
+
+    return sec;
+}

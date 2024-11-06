@@ -29,24 +29,53 @@ int main() {
     const int N_list[15] = {128, 192, 256, 384, 512, 768, 1024, 1536, 2048, 3072, 4096, 6144, 8192, 12288, 16384};
     const int K_list[15] = {1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024};
     const int outer_repeat = 10, inner_repeat = 1;
+    const int M = 512, N = 512, K = 512; // 矩阵大小
+    const int BM = 32, BN = 32; // 块大小
+    const int TESTNUM = 15; // 测试次数
+
+    // --------------------------------------------
+    // cublas版本的矩阵乘法
+
+    printf("\nKernel = cublasGemm\n");
+
+    // 计算误差
+    float max_error = testCublasMaxError(M, N, K);
+    printf("Max error: %f\n", max_error);
+
+    // 测试性能
+    for (int i = 0; i < TESTNUM; i ++ ) {
+        const int M = M_list[i], N = N_list[i], K = K_list[i];
+
+        double max_sec = 0.0;
+        double min_sec = DBL_MAX;
+        double total_sec = 0.0;
+
+        for (int j = 0; j < outer_repeat; j ++ ) {
+            double this_sec = testCublasPerformance(M, N, K, inner_repeat);
+            max_sec = max(max_sec, this_sec);
+            min_sec = min(min_sec, this_sec);
+            total_sec += this_sec;
+        }
+
+        double avg_sec = total_sec / outer_repeat;
+        double avg_Gflops = 2.0 * M * N * K / avg_sec / 1024 / 1024 / 1024;
+
+        printf("M N K = %6d %6d %6d, Time = %12.8lf %12.8lf %12.8lf s, AVG Performance = %10.4lf Gflops\n", M, N, K, min_sec, avg_sec, max_sec, avg_Gflops);
+    }
 
     // --------------------------------------------
     // naive版本的矩阵乘法
 
     printf("\nKernel = naiveGemm\n");
-
-    const int BM = 32, BN = 32; // block size
     void (*gpuGemm) (float *, float *, float *, const int, const int, const int) = naiveGemm;
-    const int M = 512, N = 512, K = 512; // 矩阵大小
 
     // 计算误差
     dim3 blk(BM, BN);
     dim3 grid(ceil_div(M, BM), ceil_div(N, BN));
-    float max_error = testMaxError(gpuGemm, grid, blk, M, N, K);
+    max_error = testMaxError(gpuGemm, grid, blk, M, N, K);
     printf("Max error: %f\n", max_error);
 
     // 测试性能
-    const int TESTNUM = 15;
     for (int i = 0; i < TESTNUM; i ++ ) {
         const int M = M_list[i], N = N_list[i], K = K_list[i];
 
