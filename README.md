@@ -5,11 +5,11 @@
 峰值吞吐量(FLOPS) = CUDA 核心数 × 时钟频率 × 每个 CUDA 核心每个周期的 FLOPS
 ```
 以本repo使用的GPU为例：
-NVIDIA GeForce RTX 2070 
-CUDA 核心数: 2304
+NVIDIA A100-PCIE-40GB 
+CUDA 核心数: 6912
 时钟频率: 1410 MHz
 每个 CUDA 核心每个周期的 FLOPS: 2
-峰值吞吐量(FLOPS) = 2304 × 1410 × 2 = 6.5 TFLOPS = 6500 GFLOPS
+峰值吞吐量(FLOPS) = 6912 × 1410 × 2 = 19.46 TFLOPS = 19460 GFLOPS
 
 ## 矩阵乘法
 矩阵乘法是一种常见的线性代数运算，其计算公式如下：
